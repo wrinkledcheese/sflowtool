@@ -415,8 +415,11 @@ typedef struct _SFSample {
 
 typedef struct _NFFlow5 {
   uint32_t srcIP;
+  uint32_t pad3[ 3 ];
   uint32_t dstIP;
+  uint32_t pad4[ 3 ];
   uint32_t nextHop;
+  uint32_t pad5[ 3 ];
   uint16_t if_in;
   uint16_t if_out;
   uint32_t frames;
@@ -433,7 +436,7 @@ typedef struct _NFFlow5 {
   uint16_t dstAS;
   uint8_t srcMask;  /* No. bits */
   uint8_t dstMask;  /* No. bits */
-  uint16_t pad2;
+  uint8_t pad2[ 2 ];
 } NFFlow5;
 
 typedef struct _NFFlowHdr5 {
@@ -476,6 +479,15 @@ typedef struct _NFFlowPkt5 {
 #define ID_SRC_MASK 9
 #define ID_DST_MASK 13
 #define ID_SAMPLING_INTERVAL 34
+/* NetFlow v9 IPv6 support */
+#define ID_IPV6_SRC_ADDR 27
+#define ID_IPV6_DST_ADDR 28
+#define ID_IPV6_SRC_MASK 29
+#define ID_IPV6_DST_MASK 30
+#define ID_IPV6_FLOW_LABEL 31
+#define ID_IP_PROTOCOL_VERSION 60
+#define ID_IPV6_NEXT_HOP 62
+
 
 /* NetFlow v9/ipfix element sizes */
 
@@ -498,6 +510,13 @@ typedef struct _NFFlowPkt5 {
 #define SZ_SRC_MASK 1
 #define SZ_DST_MASK 1
 #define SZ_SAMPLING_INTERVAL 4
+/* NetFlow v9 IPv6 template extension support */
+#define SZ_IPV6_SRC_ADDR 16
+#define SZ_IPV6_DST_ADDR 16
+#define SZ_IPV6_SRC_MASK 1
+#define SZ_IPV6_DST_MASK 1
+#define SZ_IP_PROTOCOL_VERSION 1
+#define SZ_IPV6_NEXT_HOP 16
 
 /* NetFlow v9/ipfix element type */
 
@@ -530,14 +549,40 @@ static const NFField9 nfField9[] = {
  { ID_SAMPLING_INTERVAL, SZ_SAMPLING_INTERVAL }
  };
 
+ static const NFField9 nfField9_ipv6[] = {
+ { ID_IPV6_SRC_ADDR, SZ_IPV6_SRC_ADDR },
+ { ID_IPV6_DST_ADDR, SZ_IPV6_DST_ADDR },
+ { ID_IPV6_NEXT_HOP, SZ_IPV6_NEXT_HOP },
+ { ID_IF_IN, SZ_IF_IN },
+ { ID_IF_OUT, SZ_IF_OUT },
+ { ID_PACKETS, SZ_PACKETS },
+ { ID_BYTES, SZ_BYTES },
+ { ID_FIRST_SWITCHED, SZ_FIRST_SWITCHED },
+ { ID_LAST_SWITCHED, SZ_LAST_SWITCHED },
+ { ID_SRC_PORT, SZ_SRC_PORT },
+ { ID_DST_PORT, SZ_DST_PORT },
+ { ID_TCP_FLAGS, SZ_TCP_FLAGS },
+ { ID_PROTOCOL, SZ_PROTOCOL },
+ { ID_TOS, SZ_TOS },
+ { ID_SRC_AS, SZ_SRC_AS },
+ { ID_DST_AS, SZ_DST_AS },
+ { ID_IPV6_SRC_MASK, SZ_IPV6_SRC_MASK },
+ { ID_IPV6_DST_MASK, SZ_IPV6_DST_MASK },
+ { ID_SAMPLING_INTERVAL, SZ_SAMPLING_INTERVAL },
+ { ID_IP_PROTOCOL_VERSION, SZ_IP_PROTOCOL_VERSION }
+ };
+
 /* The NetFlow v9 flow will be shaped similarly to v5,
  * but we move sampling interval from the v5 header into
  * the flow dataset and expand the interface field widths. */
-
+// I hate pads
 typedef struct _NFFlow9 {
   uint32_t srcIP;
+  uint8_t pad1[ 12 ];
   uint32_t dstIP;
+  uint8_t pad2[ 12 ];
   uint32_t nextHop;
+  uint8_t pad3[ 12 ];
   uint32_t if_in;
   uint32_t if_out;
   uint32_t packets;
@@ -554,7 +599,31 @@ typedef struct _NFFlow9 {
   uint8_t srcMask;
   uint8_t dstMask;
   uint32_t samplingInterval;
+  uint8_t pad4;
 } __attribute__ ((packed)) NFFlow9;
+
+typedef struct _NFFlow9_ipv6 {
+  uint8_t srcIP[16];
+  uint8_t dstIP[16];
+  uint8_t nextHop[16];
+  uint32_t if_in;
+  uint32_t if_out;
+  uint32_t packets;
+  uint32_t bytes;
+  uint32_t firstTime;
+  uint32_t lastTime;
+  uint16_t srcPort;
+  uint16_t dstPort;
+  uint8_t tcpFlags;
+  uint8_t ipProto;
+  uint8_t ipTos;
+  uint32_t srcAS;
+  uint32_t dstAS;
+  uint8_t srcMask;
+  uint8_t dstMask;
+  uint32_t samplingInterval;
+  uint8_t ipPortocolVersion;
+} __attribute__ ((packed)) NFFlow9_ipv6;
 
 
 /* NetFlow v9 template flowset */
@@ -567,6 +636,14 @@ typedef struct _NFTemplateFlowSet9 {
   NFField9 field[19];
 } __attribute__ ((packed)) NFTemplateFlowSet9;
 
+typedef struct _NFTemplateFlowSet9_ipv6 {
+  uint16_t setId;
+  uint16_t length;
+  uint16_t templateId;
+  uint16_t fieldCount;
+  NFField9 field[20];
+} __attribute__ ((packed)) NFTemplateFlowSet9_ipv6;
+
 
 /* NetFlow v9 data flowset */
 
@@ -575,6 +652,12 @@ typedef struct _NFDataFlowSet9 {
   uint16_t length;
   NFFlow9 flow;
 } __attribute__ ((packed)) NFDataFlowSet9;
+
+typedef struct _NFDataFlowSet9_ipv6 {
+  uint16_t templateId;
+  uint16_t length;
+  NFFlow9_ipv6 flow;
+} __attribute__ ((packed)) NFDataFlowSet9_ipv6;
 
 
 /* NetFlow v9 flow packet header */
@@ -597,6 +680,12 @@ typedef struct _NFFlowPkt9 {
   NFDataFlowSet9 data;
 } __attribute__ ((packed)) NFFlowPkt9;
 
+typedef struct _NFFlowPkt9_ipv6 {
+  NFFlowHeader9 hdr;
+  NFTemplateFlowSet9_ipv6 tmpl;
+  NFDataFlowSet9_ipv6 data;
+} __attribute__ ((packed)) NFFlowPkt9_ipv6;
+
 
 /* NetFLow packet can be either v5 or v9 */
 
@@ -604,6 +693,7 @@ typedef struct _NFFlowPkt {
   union {
     NFFlowPkt5 v5;
     NFFlowPkt9 v9;
+    NFFlowPkt9_ipv6;
   };
 } __attribute__ ((packed)) NFFlowPkt;
 
@@ -1726,101 +1816,7 @@ static void sendNetFlowV5Datagram(SFSample *sample)
 
 }
 
-/*_________________---------------------------__________________
-  _________________   sendNetFlowV9Datagram   __________________
-  -----------------___________________________------------------
-*/
 
-static void sendNetFlowV9Datagram(SFSample *sample)
-{
-  NFFlowPkt9 pkt;
-
-  uint32_t now = (uint32_t)time(NULL);
-  uint32_t bytes;
-  uint16_t i = 0;
-  const size_t fieldCount = sizeof(pkt.tmpl.field) / sizeof(pkt.tmpl.field[0]);
-  /* ignore fragments */
-  if(sample->ip_fragmentOffset > 0) return;
-  /* count the bytes from the start of IP header, with the exception that
-     for udp packets we use the udp_pduLen. This is because the udp_pduLen
-     can be up tp 65535 bytes, which causes fragmentation at the IP layer.
-     Since the sampled fragments are discarded, we have to use this field
-     to get the total bytes estimates right. */
-  if(sample->udp_pduLen > 0) bytes = sample->udp_pduLen;
-  else bytes = sample->sampledPacketSize - sample->stripped - sample->offsetToIPV4;
-
-  memset(&pkt, 0, sizeof(pkt));
-
-  /* Fill packet header */
-  pkt.hdr.version = htons(9);
-  pkt.hdr.count = htons(2);  /* one template + one flow record */
-  pkt.hdr.sysUpTime = htonl(now % (3600 * 24)) * 1000;  /* pretend we started at midnight (milliseconds) */
-  pkt.hdr.unixSeconds = htonl(now);
-  pkt.hdr.flowSequence = htonl(NFFlowSequenceNo++);
-
-  /* Fill template flowset */
-  pkt.tmpl.setId = 0;
-  pkt.tmpl.length = htons(sizeof(pkt.tmpl));
-  pkt.tmpl.templateId = htons(256);
-  pkt.tmpl.fieldCount = htons(fieldCount);
-  for(i=0; i<fieldCount; i++) {
-    pkt.tmpl.field[i].id = htons(nfField9[i].id);
-    pkt.tmpl.field[i].sz = htons(nfField9[i].sz);
-  }
-
-  /* Fill data flowset */
-  pkt.data.templateId = htons(256);
-  pkt.data.length = htons(sizeof(pkt.data));
-  pkt.data.flow.srcIP = sample->ipsrc.address.ip_v4.addr;
-  pkt.data.flow.dstIP = sample->ipdst.address.ip_v4.addr;
-  pkt.data.flow.nextHop = sample->nextHop.address.ip_v4.addr;
-  /* We are no longer truncating these interface fields as with NetFlow v5 */
-  pkt.data.flow.if_in = htonl(sample->inputPort);
-  pkt.data.flow.if_out= htonl(sample->outputPort);
-
-  if(!sfConfig.disableNetFlowScale) {
-    pkt.data.flow.packets = htonl(sample->meanSkipCount);
-    pkt.data.flow.bytes = htonl(sample->meanSkipCount * bytes);
-  }
-  else {
-    /* set the sampling_interval header field */
-    uint16_t samp_ival = (uint16_t)sample->meanSkipCount;
-    pkt.data.flow.samplingInterval = htonl(samp_ival & 0x4000);
-    pkt.data.flow.packets = htonl(1);
-    pkt.data.flow.bytes = htonl(bytes);
-  }
-
-  /* set the start and end time to be now (in milliseconds since last boot) */
-  pkt.data.flow.firstTime = pkt.hdr.sysUpTime;
-  pkt.data.flow.lastTime =  pkt.hdr.sysUpTime;
-  pkt.data.flow.srcPort = htons((uint16_t)sample->dcd_sport);
-  pkt.data.flow.dstPort = htons((uint16_t)sample->dcd_dport);
-  pkt.data.flow.tcpFlags = sample->dcd_tcpFlags;
-  pkt.data.flow.ipProto = sample->dcd_ipProtocol;
-  pkt.data.flow.ipTos = sample->dcd_ipTos;
-
-  if(sfConfig.netFlowPeerAS) {
-    pkt.data.flow.srcAS = htonl(sample->src_peer_as);
-    pkt.data.flow.dstAS = htonl(sample->dst_peer_as);
-  }
-  else {
-    pkt.data.flow.srcAS = htonl(sample->src_as);
-    pkt.data.flow.dstAS = htonl(sample->dst_as);
-  }
-
-  pkt.data.flow.srcMask = (uint8_t)sample->srcMask;
-  pkt.data.flow.dstMask = (uint8_t)sample->dstMask;
-
-  #ifdef SPOOFSOURCE
-  if(sfConfig.spoofSource) {
-    sendNetFlowDatagram_spoof(sample, (NFFlowPkt *)&pkt);
-    return;
-  }
-  #endif /* SPOOFSOURCE */
-
-  /* send non-blocking */
-  send(sfConfig.netFlowOutputSocket, (char *)&pkt, sizeof(pkt), 0);
-}
 
 /*_________________---------------------------__________________
   _________________   read data fns           __________________
@@ -1938,6 +1934,124 @@ static uint32_t getAddress(SFSample *sample, SFLAddress *address) {
     SFABORT(sample, SF_ABORT_EOS);
   }
   return address->type;
+}
+
+/*_________________---------------------------__________________
+  _________________   sendNetFlowV9Datagram   __________________
+  -----------------___________________________------------------
+*/
+
+static void sendNetFlowV9Datagram(SFSample *sample)
+{
+  NFFlowPkt9_ipv6 pkt;
+
+  uint32_t now = (uint32_t)time(NULL);
+  uint32_t bytes;
+  uint16_t i = 0;
+  const size_t fieldCount = sizeof(pkt.tmpl.field) / sizeof(pkt.tmpl.field[0]);
+  /* ignore fragments */
+  if(sample->ip_fragmentOffset > 0) return;
+  /* count the bytes from the start of IP header, with the exception that
+     for udp packets we use the udp_pduLen. This is because the udp_pduLen
+     can be up tp 65535 bytes, which causes fragmentation at the IP layer.
+     Since the sampled fragments are discarded, we have to use this field
+     to get the total bytes estimates right. */
+  if(sample->udp_pduLen > 0) bytes = sample->udp_pduLen;
+  else bytes = sample->sampledPacketSize - sample->stripped - sample->offsetToIPV4;
+
+  memset(&pkt, 0, sizeof(pkt));
+
+  /* Fill packet header */
+  pkt.hdr.version = htons(9);
+  pkt.hdr.count = htons(2);  /* one template + one flow record */
+  pkt.hdr.sysUpTime = htonl(now % (3600 * 24)) * 1000;  /* pretend we started at midnight (milliseconds) */
+  pkt.hdr.unixSeconds = htonl(now);
+  pkt.hdr.flowSequence = htonl(NFFlowSequenceNo++);
+
+  /* Fill template flowset */
+  pkt.tmpl.setId = 0;
+  pkt.tmpl.length = htons(sizeof(pkt.tmpl));
+  pkt.tmpl.templateId = htons(256);
+  pkt.tmpl.fieldCount = htons(fieldCount);
+  for(i=0; i<fieldCount; i++) {
+    pkt.tmpl.field[i].id = htons(nfField9[i].id);
+    pkt.tmpl.field[i].sz = htons(nfField9[i].sz);
+  }
+
+  /* Fill data flowset */
+  pkt.data.templateId = htons(256);
+  pkt.data.length = htons(sizeof(pkt.data));
+
+
+  SFLAddress* src_addr;
+  SFLAddress* dst_addr;
+  SFLAddress* next_hop;
+  
+  getAddress( sample, src_addr );
+  getAddress( sample, dst_addr );
+  getAddress( sample, next_hop );
+
+  switch( src_addr->type ){
+    case SFLADDRESSTYPE_IP_V4:
+      memcpy( &( pkt.data.flow.srcIP ), &src_addr->address, 4);
+      memcpy( &( pkt.data.flow.dstIP ), &dst_addr->address, 4);
+      memcpy( &( pkt.data.flow.nextHop ), &next_hop->address, 4);
+      break;
+    case SFLADDRESSTYPE_IP_V6:
+      memcpy( &( pkt.data.flow.srcIP ), &src_addr->address, 16);
+      memcpy( &( pkt.data.flow.dstIP ), &dst_addr->address, 16);
+      memcpy( &( pkt.data.flow.nextHop ), &next_hop->address, 16);
+      pkt.data.flow.ipPortocolVersion = 6;
+      break;
+  }
+  
+  
+  /* We are no longer truncating these interface fields as with NetFlow v5 */
+  pkt.data.flow.if_in = htonl(sample->inputPort);
+  pkt.data.flow.if_out= htonl(sample->outputPort);
+
+  if(!sfConfig.disableNetFlowScale) {
+    pkt.data.flow.packets = htonl(sample->meanSkipCount);
+    pkt.data.flow.bytes = htonl(sample->meanSkipCount * bytes);
+  }
+  else {
+    /* set the sampling_interval header field */
+    uint16_t samp_ival = (uint16_t)sample->meanSkipCount;
+    pkt.data.flow.samplingInterval = htonl(samp_ival & 0x4000);
+    pkt.data.flow.packets = htonl(1);
+    pkt.data.flow.bytes = htonl(bytes);
+  }
+
+  /* set the start and end time to be now (in milliseconds since last boot) */
+  pkt.data.flow.firstTime = pkt.hdr.sysUpTime;
+  pkt.data.flow.lastTime =  pkt.hdr.sysUpTime;
+  pkt.data.flow.srcPort = htons((uint16_t)sample->dcd_sport);
+  pkt.data.flow.dstPort = htons((uint16_t)sample->dcd_dport);
+  pkt.data.flow.tcpFlags = sample->dcd_tcpFlags;
+  pkt.data.flow.ipProto = sample->dcd_ipProtocol;
+  pkt.data.flow.ipTos = sample->dcd_ipTos;
+
+  if(sfConfig.netFlowPeerAS) {
+    pkt.data.flow.srcAS = htonl(sample->src_peer_as);
+    pkt.data.flow.dstAS = htonl(sample->dst_peer_as);
+  }
+  else {
+    pkt.data.flow.srcAS = htonl(sample->src_as);
+    pkt.data.flow.dstAS = htonl(sample->dst_as);
+  }
+
+  pkt.data.flow.srcMask = (uint8_t)sample->srcMask;
+  pkt.data.flow.dstMask = (uint8_t)sample->dstMask;
+
+  #ifdef SPOOFSOURCE
+  if(sfConfig.spoofSource) {
+    sendNetFlowDatagram_spoof(sample, (NFFlowPkt *)&pkt);
+    return;
+  }
+  #endif /* SPOOFSOURCE */
+
+  /* send non-blocking */
+  send(sfConfig.netFlowOutputSocket, (char *)&pkt, sizeof(pkt), 0);
 }
 
 static char *printTag(uint32_t tag, char *buf) {
