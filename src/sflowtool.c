@@ -693,7 +693,7 @@ typedef struct _NFFlowPkt {
 /* NetFlow functions to send datagrams */
 static void sendNetFlowV5Datagram(SFSample *sample);
 static void sendNetFlowV9Datagram(SFSample *sample);
-//static void sendNetFlowV9Datagram_ipv6(SFSample *sample);
+static void sendNetFlowV9Datagram_ipv6(SFSample *sample);
 static void (*sendNetFlowDatagram)(SFSample *sample) = sendNetFlowV5Datagram;
 
 static void readFlowSample_header(SFSample *sample);
@@ -2027,7 +2027,6 @@ static void sendNetFlowV9Datagram(SFSample *sample)
 
 static void sendNetFlowV9Datagram_ipv6(SFSample *sample)
 {
-  fprintf(ERROUT, "sendNetFlowV9Datagram_ipv6");
   NFFlowPkt9_ipv6 pkt;
 
   uint32_t now = (uint32_t)time(NULL);
@@ -2059,35 +2058,45 @@ static void sendNetFlowV9Datagram_ipv6(SFSample *sample)
   pkt.tmpl.templateId = htons(256);
   pkt.tmpl.fieldCount = htons(fieldCount);
   for(i=0; i<fieldCount; i++) {
-    pkt.tmpl.field[i].id = htons(nfField9[i].id);
-    pkt.tmpl.field[i].sz = htons(nfField9[i].sz);
+    pkt.tmpl.field[i].id = htons(nfField9_ipv6[i].id);
+    pkt.tmpl.field[i].sz = htons(nfField9_ipv6[i].sz);
   }
 
   /* Fill data flowset */
   pkt.data.templateId = htons(256);
   pkt.data.length = htons(sizeof(pkt.data));
 
-fprintf(ERROUT, "addresses");
-  SFLAddress* src_addr;
-  SFLAddress* dst_addr;
-  SFLAddress* next_hop;
+  //SFLAddress* src_addr;
+  //SFLAddress* dst_addr;
+  //SFLAddress* next_hop;
   
-  getAddress( sample, src_addr );
-  fprintf(ERROUT, "getaddress src addr success");
-  getAddress( sample, dst_addr );
-  fprintf(ERROUT, "getaddress dst addr syccess");
-  getAddress( sample, next_hop );
-  fprintf(ERROUT, "getaddress next hop success");
+  //getAddress( sample, src_addr );
+  //getAddress( sample, dst_addr );
+  //getAddress( sample, next_hop );
 
-  memcpy( &( pkt.data.flow.srcIP ), &src_addr->address, 16);
-  fprintf(ERROUT, "memcpy src");
-  memcpy( &( pkt.data.flow.dstIP ), &dst_addr->address, 16);
-  fprintf(ERROUT, "memcpy dst");
-  memcpy( &( pkt.data.flow.nextHop ), &next_hop->address, 16);
-  fprintf(ERROUT, "memcpy next hop");
+  memcpy( &( pkt.data.flow.srcIP ), &sample->ipsrc.address.ip_v6.addr, 16);
+  printf("addr6 %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u %u", 
+sample->ipsrc.address.ip_v6.addr[0],
+sample->ipsrc.address.ip_v6.addr[1],
+sample->ipsrc.address.ip_v6.addr[2],
+sample->ipsrc.address.ip_v6.addr[3],
+sample->ipsrc.address.ip_v6.addr[4],
+sample->ipsrc.address.ip_v6.addr[5],
+sample->ipsrc.address.ip_v6.addr[6],
+sample->ipsrc.address.ip_v6.addr[6],
+sample->ipsrc.address.ip_v6.addr[7],
+sample->ipsrc.address.ip_v6.addr[9],
+sample->ipsrc.address.ip_v6.addr[10],
+sample->ipsrc.address.ip_v6.addr[11],
+sample->ipsrc.address.ip_v6.addr[12],
+sample->ipsrc.address.ip_v6.addr[13],
+sample->ipsrc.address.ip_v6.addr[14],
+sample->ipsrc.address.ip_v6.addr[15]
+);
+  //memcpy( &( pkt.data.flow.dstIP ), &dst_addr->address, 16);
+  //memcpy( &( pkt.data.flow.nextHop ), &next_hop->address, 16);
   pkt.data.flow.ipPortocolVersion = 6;
   
-  fprintf(ERROUT, "onward");
   /* We are no longer truncating these interface fields as with NetFlow v5 */
   pkt.data.flow.if_in = htonl(sample->inputPort);
   pkt.data.flow.if_out= htonl(sample->outputPort);
@@ -2111,8 +2120,8 @@ fprintf(ERROUT, "addresses");
   pkt.data.flow.dstPort = htons((uint16_t)sample->dcd_dport);
   pkt.data.flow.tcpFlags = sample->dcd_tcpFlags;
   pkt.data.flow.ipProto = sample->dcd_ipProtocol;
+printf("ip proto: %d\n", pkt.data.flow.ipProto);
   pkt.data.flow.ipTos = sample->dcd_ipTos;
-fprintf(ERROUT, "upward");
   if(sfConfig.netFlowPeerAS) {
     pkt.data.flow.srcAS = htonl(sample->src_peer_as);
     pkt.data.flow.dstAS = htonl(sample->dst_peer_as);
@@ -3254,7 +3263,7 @@ static void readFlowSample_v2v4(SFSample *sample)
     switch(sfConfig.outputFormat) {
     case SFLFMT_NETFLOW:
       /* if we are exporting netflow and we have an IPv4 layer, compose the datagram now */
-      fprintf( STDERR, "NETFLOW EXPORT");
+fprintf(ERROUT,"NETFLOW EXPORT");
       if(sfConfig.netFlowOutputSocket && (sample->gotIPV4 || sample->gotIPV4Struct)) sendNetFlowDatagram(sample);
       if(sfConfig.netFlowOutputSocket && (sample->gotIPV6 || sample->gotIPV6Struct)) sendNetFlowV9Datagram_ipv6(sample);
       break;
@@ -3353,12 +3362,11 @@ static void readFlowSample(SFSample *sample, int expanded)
       sf_log(sample,"flowBlock_tag %s\n", printTag(tag, buf));
       length = getData32(sample);
       start = (uint8_t *)sample->datap;
-
       switch(tag) {
       case SFLFLOW_HEADER:     readFlowSample_header(sample); break;
       case SFLFLOW_ETHERNET:   readFlowSample_ethernet(sample, ""); break;
       case SFLFLOW_IPV4:       readFlowSample_IPv4(sample, ""); break;
-      case SFLFLOW_IPV6:       readFlowSample_IPv6(sample, ""); break;
+      case SFLFLOW_IPV6:       readFlowSample_IPv6(sample, "");fprintf( ERROUT, " \n ipv6 \n"); break;
       case SFLFLOW_MEMCACHE:   readFlowSample_memcache(sample); break;
       case SFLFLOW_HTTP:       readFlowSample_http(sample, tag); break;
       case SFLFLOW_HTTP2:      readFlowSample_http(sample, tag); break;
@@ -3409,7 +3417,8 @@ static void readFlowSample(SFSample *sample, int expanded)
     switch(sfConfig.outputFormat) {
     case SFLFMT_NETFLOW:
       /* if we are exporting netflow and we have an IPv4 layer, compose the datagram now */
-      if(sfConfig.netFlowOutputSocket && sample->gotIPV4) sendNetFlowDatagram(sample);
+      //if(sfConfig.netFlowOutputSocket && sample->gotIPV4) sendNetFlowDatagram(sample);
+      if(sfConfig.netFlowOutputSocket && sample->gotIPV6) sendNetFlowV9Datagram_ipv6(sample);
       break;
     case SFLFMT_PCAP:
       /* if we are writing tcpdump format, write the next packet record now */
@@ -4696,12 +4705,24 @@ static void readSFlowDatagram(SFSample *sample)
       sf_log(sample,"sampleType_tag %s\n", printTag(sample->sampleType, buf));
       if(sample->datagramVersion >= 5) {
 	switch(sample->sampleType) {
-	case SFLFLOW_SAMPLE: readFlowSample(sample, NO); break;
-	case SFLCOUNTERS_SAMPLE: readCountersSample(sample, NO); break;
-	case SFLFLOW_SAMPLE_EXPANDED: readFlowSample(sample, YES); break;
-	case SFLCOUNTERS_SAMPLE_EXPANDED: readCountersSample(sample, YES); break;
-	case SFLRTMETRIC: readRTMetric(sample); break;
-	case SFLRTFLOW: readRTFlow(sample); break;
+	case SFLFLOW_SAMPLE: readFlowSample(sample, NO); 
+//fprintf(ERROUT, "sflow sample | ");
+break;
+	case SFLCOUNTERS_SAMPLE: readCountersSample(sample, NO); 
+//fprintf(ERROUT, "counters sample | ");
+break;
+	case SFLFLOW_SAMPLE_EXPANDED: readFlowSample(sample, YES); 
+//fprintf(ERROUT, " sflow expanded sample | ");
+break;
+	case SFLCOUNTERS_SAMPLE_EXPANDED: readCountersSample(sample, YES); 
+fprintf(ERROUT, " sflow coutners expanded sample | ");
+break;
+	case SFLRTMETRIC: readRTMetric(sample); 
+fprintf(ERROUT, " sflow metric | ");
+break;
+	case SFLRTFLOW: readRTFlow(sample); 
+fprintf(ERROUT, " ");
+break;
 	default: skipTLVRecord(sample, sample->sampleType, getData32(sample), "sample"); break;
 	}
       }
@@ -4901,7 +4922,6 @@ static void readPacket(int soc)
       sample.sourceIP.address.ip_v4 = v4src;
     }
   }
-  fprintf( ERROUT, "RECEIVE PACKET");
   receiveSFlowDatagram(&sample);
 }
 
